@@ -222,7 +222,7 @@ Calvin is open to a bigger screen, 3D on the base model and either HDL. With emu
 
 - Open to a bigger screen, 3D on the base model, and Verilog or Amaranth.
 - Asked whether the FPGA could emulate more: see section 10.
-- Still open: how far the 40 to 50 EUR budget can move.
+- **Decided: Option 2.** Budget moves to about 70 to 90 EUR per device for one ~25k LUT FPGA + SDRAM: BitKit PPU with 3D-lite plus NES/SNES/GB/GBC/SMS hardware cores. Next: choose ECP5-25 vs GW5A-25 and run the bench prototype (Tang Primer 25K or an ECP5-25 board + P4 dev board).
 
 ## Sources
 
