@@ -12,7 +12,7 @@ Research audit, 2026-11-14. Research only: no board design yet.
 - **Honest caveat:** at 320×240 the P4 alone (400 MHz dual core, PPA blender, 2D-DMA) can probably push 2D at 60 fps. On the S3 the bottleneck measured so far is Lua, not pixel fill. An FPGA wins on full-screen looks/shaders, scanline effects, floor()/2.5D, bigger screens, and "zero CPU" sprites. It does not make Lua faster.
 - **Recommendation:** prototype first, chip-down later. Wire a P4 dev board to a cheap iCE40 board over the P4's own i80 LCD bus, build a small MIT "BitKit PPU" (clean-room), and measure it against a P4-only renderer. If it wins, put an iCE40UP5K on the main board between the P4 and the screen, configured by the P4 at boot (no flash chip). Keep 3D as a later ECP5 option.
 
-- **Decided (Calvin, 2026-11-14): two models.** **PocketBit** (40 to 50 EUR, iCE40UP5K GPU) and **PocketBit Pro** (70 to 90 EUR, ~25k LUT FPGA + SDRAM with 3D-lite and hardware NES/SNES/GB/GBC/SMS). See section 11.
+- **Decided (Calvin, 2026-11-14): two models.** **PocketBit** (20 to 30 EUR, no FPGA, P4 software rendering) and **PocketBit Pro** (50 to 60 EUR, ECP5-25 ~25k LUT FPGA + SDRAM with 3D-lite and hardware NES/SNES/GB/GBC/SMS). See section 11.
 
 ## 1. Has anything like this been built?
 
@@ -226,14 +226,39 @@ Decided by Calvin on 2026-11-14. One software platform, two boards.
 
 | | **PocketBit** | **PocketBit Pro** |
 |---|---|---|
-| Target price per device | 40 to 50 EUR | 70 to 90 EUR |
+| Target price per device | 20 to 30 EUR (was 40 to 50) | 50 to 60 EUR (was 70 to 90) |
 | CPU / radio | ESP32-P4 + ESP32-C6 | same |
-| GPU | iCE40UP5K "BitKit PPU" (QFN-48) | ECP5-25 or GW5A-25 + 32 MB SDRAM (BGA) |
+| GPU | None: P4 software renderer (iCE40UP5K only if the budget allows) | ECP5-25 + 32 MB SDRAM (BGA); GW5A-25 only if its price drops |
 | Graphics | 2 tile layers, 64 to 128 sprites, palette, looks, scanline effects | Same PPU + affine/Mode-7 floor + 3D-lite rasterizer (flat/Gouraud, simple textures) |
 | Screen | 3.2" 320×240 ST7789 (i80) | Bigger: 3.5 to 4" 480×320 or 640×480 (i80/RGB, MIPI possible on GW5A) |
 | Emulation | P4 software: GB/GBC/NES now, SMS/SNES/Genesis later | P4 software **plus** hardware cores: NES, SNES, GB/GBC, SMS (GPL bitstreams from SD) |
 | Board | 4-layer, all QFN/QFP | 6-layer, BGA FPGA + SDRAM |
 | Open toolchain | Yosys + nextpnr-ice40 | Yosys + nextpnr-ecp5 (ECP5) or Apicula (GW5A, support in progress) |
+
+### Price check: 20 to 30 EUR base, 50 to 60 EUR Pro (Calvin, 2026-11-14)
+
+Calvin then asked for a cheaper split: **PocketBit around 20 to 30 EUR, Pro around 50 to 60 EUR**. Rough parts cost per device in EUR at about 100 units (LCSC/AliExpress list prices, before shipping, VAT and tariffs; to be replaced by a real BOM):
+
+| Block | PocketBit | PocketBit Pro |
+|---|---|---|
+| ESP32-P4NRW32 (32 MB PSRAM inside, [LCSC from 4.74 USD](https://www.lcsc.com/product-detail/C22387510.html)) + 16 MB flash | 5 to 6 | 5 to 6 |
+| ESP32-C6 radio (bare chip ~1.5, or [C6-MINI module ~2.84 USD](https://www.lcsc.com/product-detail/C5736265.html)) | 1.5 to 3 | 1.5 to 3 |
+| Screen | 2.8 to 3.2" 320×240: 5 to 12 | 3.5 to 4" 480×320 or 640×480: 10 to 18 |
+| LiPo + charger + regulators | 4 to 6 | 5 to 7 |
+| Audio (2 amps + 2 speakers) | 2 to 3.5 | 2 to 3.5 |
+| Buttons, side PCBs, FFC | 2 to 3 | 2 to 3 |
+| Analog triggers (Hall + ADC) | 0 (digital) to 4 | 2 to 4 |
+| microSD, USB-C, RTC, passives | 1.5 to 2.5 | 1.5 to 2.5 |
+| PCB + assembly | 4-layer: 4 to 7 | 6-layer + BGA: 7 to 11 |
+| Shell | 2 to 4 | 2 to 4 |
+| GPU | none, or iCE40UP5K +7 to 15 | ECP5-25 ~11 to 15 + SDRAM 2 to 3 |
+| **Total (rough)** | **~27 to 40 without FPGA, ~35 to 55 with iCE40** | **~51 to 80** |
+
+What this means:
+
+- **PocketBit at 20 to 30 EUR only works without the FPGA**, with a cheap 2.8 to 3.2" screen, digital triggers and some volume (a few hundred units). That is fine: at 320×240 the P4 renders 2D in software, as the GB300-P4 already shows. The iCE40 middle option is dropped.
+- **PocketBit Pro at 50 to 60 EUR works only with the ECP5-25** at its usual ~11.5 USD (out of stock at LCSC today, so watch stock or use another distributor) and a 480×320 screen. The GW5A-25 at 42.92 USD pushes the Pro to ~80 EUR.
+- So the FPGA becomes the Pro feature: GPU with 3D-lite, bigger screen, hardware NES/SNES/GB/GBC/SMS. The base model shares everything else and runs every game in software.
 
 ### What stays shared
 
