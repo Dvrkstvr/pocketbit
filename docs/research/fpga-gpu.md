@@ -12,6 +12,8 @@ Research audit, 2026-11-14. Research only: no board design yet.
 - **Honest caveat:** at 320×240 the P4 alone (400 MHz dual core, PPA blender, 2D-DMA) can probably push 2D at 60 fps. On the S3 the bottleneck measured so far is Lua, not pixel fill. An FPGA wins on full-screen looks/shaders, scanline effects, floor()/2.5D, bigger screens, and "zero CPU" sprites. It does not make Lua faster.
 - **Recommendation:** prototype first, chip-down later. Wire a P4 dev board to a cheap iCE40 board over the P4's own i80 LCD bus, build a small MIT "BitKit PPU" (clean-room), and measure it against a P4-only renderer. If it wins, put an iCE40UP5K on the main board between the P4 and the screen, configured by the P4 at boot (no flash chip). Keep 3D as a later ECP5 option.
 
+- **Decided (Calvin, 2026-11-14): two models.** **PocketBit** (40 to 50 EUR, iCE40UP5K GPU) and **PocketBit Pro** (70 to 90 EUR, ~25k LUT FPGA + SDRAM with 3D-lite and hardware NES/SNES/GB/GBC/SMS). See section 11.
+
 ## 1. Has anything like this been built?
 
 ### ESP32-P4 + FPGA
@@ -218,11 +220,44 @@ Calvin is open to a bigger screen, 3D on the base model and either HDL. With emu
 - **Option 2, ~70 to 90 EUR (recommended if the budget can move):** one ~25k LUT FPGA (ECP5-25 for the mature open toolchain, or GW5A-25 which is in stock and has MIPI for a bigger screen) + 32 MB SDRAM. Runs the BitKit PPU with a 3D-lite rasterizer for our games **and** NES/SNES/GB/GBC/SMS cores in hardware. Bigger screen (480×320 or 640×480) fits.
 - **Option 3, 100 EUR+:** 60k class for Genesis + GBA too. Gets close to buying a Tang Console or Game Bub, and the board gets much harder (BGA-484, DDR3).
 
+## 11. Lineup: PocketBit and PocketBit Pro
+
+Decided by Calvin on 2026-11-14. One software platform, two boards.
+
+| | **PocketBit** | **PocketBit Pro** |
+|---|---|---|
+| Target price per device | 40 to 50 EUR | 70 to 90 EUR |
+| CPU / radio | ESP32-P4 + ESP32-C6 | same |
+| GPU | iCE40UP5K "BitKit PPU" (QFN-48) | ECP5-25 or GW5A-25 + 32 MB SDRAM (BGA) |
+| Graphics | 2 tile layers, 64 to 128 sprites, palette, looks, scanline effects | Same PPU + affine/Mode-7 floor + 3D-lite rasterizer (flat/Gouraud, simple textures) |
+| Screen | 3.2" 320×240 ST7789 (i80) | Bigger: 3.5 to 4" 480×320 or 640×480 (i80/RGB, MIPI possible on GW5A) |
+| Emulation | P4 software: GB/GBC/NES now, SMS/SNES/Genesis later | P4 software **plus** hardware cores: NES, SNES, GB/GBC, SMS (GPL bitstreams from SD) |
+| Board | 4-layer, all QFN/QFP | 6-layer, BGA FPGA + SDRAM |
+| Open toolchain | Yosys + nextpnr-ice40 | Yosys + nextpnr-ecp5 (ECP5) or Apicula (GW5A, support in progress) |
+
+### What stays shared
+
+- Firmware, BitKit runtime and carts. `bk_gpu` gets three backends: software (browser, sim), `ppu` (PocketBit), `ppu-pro` (Pro). The Lua API is the same everywhere.
+- **Every BitKit game runs on both** (standing rule: everything runs on the real device). Pro-only extras are speed and resolution: on the base model 3D-lite and big floors fall back to the P4 software path, possibly at lower fps.
+- Button PCBs over FFC, audio, power/charging, RTC, ESP-NOW. Base and Pro can link and play together.
+- The BitKit PPU gateware is one MIT codebase with a size parameter; the Pro build switches on the extra units.
+
+### Pro-only items
+
+- Emulator cores in hardware, kept in a separate GPL repo and loaded from `/cores` on the SD card (section 10).
+- Bigger screen layout in the launcher and studio (the studio previews both resolutions).
+
+### Order of work
+
+1. Bench prototype of the shared PPU on an iCE40 board (base) and a Tang Primer 25K or ECP5-25 board (Pro), both on a P4 dev board.
+2. Pick the Pro FPGA (ECP5-25 vs GW5A-25) from stock, price and toolchain results.
+3. PocketBit board first (simpler, cheaper), then PocketBit Pro reusing its schematic blocks.
+
 ## Answers from Calvin (2026-11-14)
 
 - Open to a bigger screen, 3D on the base model, and Verilog or Amaranth.
 - Asked whether the FPGA could emulate more: see section 10.
-- **Decided: Option 2.** Budget moves to about 70 to 90 EUR per device for one ~25k LUT FPGA + SDRAM: BitKit PPU with 3D-lite plus NES/SNES/GB/GBC/SMS hardware cores. Next: choose ECP5-25 vs GW5A-25 and run the bench prototype (Tang Primer 25K or an ECP5-25 board + P4 dev board).
+- **Decided: Option 2.** Budget moves to about 70 to 90 EUR per device for one ~25k LUT FPGA + SDRAM: BitKit PPU with 3D-lite plus NES/SNES/GB/GBC/SMS hardware cores. Then Calvin chose to make both: PocketBit (Option 1) and PocketBit Pro (Option 2), see section 11. Next: choose ECP5-25 vs GW5A-25 and run the bench prototype (Tang Primer 25K or an ECP5-25 board + P4 dev board).
 
 ## Sources
 
