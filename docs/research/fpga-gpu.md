@@ -115,7 +115,7 @@ Prices are from distributor pages on 2026-11-14; LCSC live stock could not be fu
 | **Lattice iCE40UP5K-SG48I** | 5,280 | 128 KB SPRAM + 15 KB BRAM, 8 DSP | QFN-48 (7×7) | Yosys + nextpnr-ice40, mature | ~6 to 8 USD at Western distributors; LCSC lists the WLCSP version from 12.63 USD (out of stock) | [C2678152](https://jlcpcb.com/partdetail/Lattice-ICE40UP5KSG48I/C2678152), extended part | **Best for 2D PPU** |
 | Gowin GW1NR-LV9QN88 | 8,640 | 64 Mbit PSRAM in package | QFN-88 | Apicula (supported) | Mouser 27 to 37 USD; much cheaper in Chinese channels (Tang Nano 9K board ~15 to 20 USD) | Check LCSC | Good, but price via Western/LCSC kills the budget |
 | Gowin GW2AR-LV18QN88 | 20,736 | 64 Mbit SDRAM in package | QFN-88 | Apicula (supported) | [LCSC 41.33 USD, 89 in stock](https://www.lcsc.com/product-detail/C380550.html) | C380550 | Could do 3D-lite, too expensive |
-| Gowin GW5A-LV25 | 23,040 | 1 Mbit BSRAM, 28 multipliers, hard MIPI | BGA-121 | Apicula GW5A in progress (NLnet funded) | Board-level only seen | Check | Only if MIPI pass-through is wanted |
+| Gowin GW5A-LV25 | 23,040 | 1 Mbit BSRAM, 28 multipliers, hard MIPI | BGA-121 | Apicula GW5A in progress (NLnet funded) | [LCSC 42.92 USD, 459 in stock](https://www.lcsc.com/product-detail/C45617374.html) | C45617374 | Runs NES + SNES cores (Tang Primer 25K); MIPI pass-through possible |
 | Lattice LFE5U-25F-6BG256C | 24,000 | 1 Mbit BRAM, 28 DSP | BGA-256 (0.8 mm) | Yosys + nextpnr-ecp5 (Trellis), mature | [LCSC from 11.51 USD (out of stock)](https://lcsc.com/product-detail/Programmable-Logic-Device-CPLDs-FPGAs_Lattice-LFE5U-25F-6BG256C_C1521614.html) | C1521614 | **Best for 3D later**, needs 6-layer board + RAM |
 
 Both Lattice parts are the safe pick for an open, community-friendly project: the open toolchains are mature and nobody needs a vendor licence to build the gateware.
@@ -175,11 +175,54 @@ The iCE40 path is tight but possible inside 50 EUR if the P4 module and screen s
 
 Software side (BitKit): a `bk_gpu` layer with two backends, "software" (today's renderer, used in the browser and on boards without a PPU) and "ppu" (sends tile maps, sprite tables, palette and look registers each vblank). Lua APIs (spr, map, pal, shade, display, raster, floor) stay the same, so carts run on both.
 
-## Open questions for Calvin
+## 10. Could the FPGA emulate more systems?
 
-- Is a bigger screen (480×320 or 640×480) on the table? That is where the PPU pays off most.
-- Is 3D a must on the base model, or fine as an optional GPU module?
-- Verilog or Amaranth (Python) for the PPU? Amaranth may suit the community better; Verilog has more examples.
+Yes, and it can be **the same chip** as the GPU: the P4 loads a different bitstream per app (BitKit PPU for our games, a console core for an emulator app), the same way it loads the PPU at boot. Most of the open cores below come from MiSTer and were ported to cheap Gowin boards by nand2mario's [TangCore](https://github.com/nand2mario/snestang) family (NESTang, SNESTang, SMSTang, MDTang, GBATang).
+
+### What the P4 already does in software
+
+The P4 is fast enough that software emulation already covers most of the older systems: the GB300-P4 runs Retro-Go with SNES and Genesis, and we already have GB/GBC/NES in BitKit. So an FPGA mostly buys **accuracy, exact timing, low latency and zero CPU load**, not new systems. The one system it really unlocks is the **GBA** (no good P4 software option today).
+
+### Which FPGA size runs which system
+
+| FPGA class | Example part | Hardware cores known to fit | Notes |
+|---|---|---|---|
+| iCE40UP5K (5k LUT) | our PPU chip | None useful | Too small for a whole console. GPU only |
+| ~8 to 9k LUT + PSRAM | GW1NR-9 | GB, maybe NES | Hobby ports exist, nothing polished |
+| **~18 to 25k LUT + SDRAM** | GW2AR-18 (Tang Nano 20K), GW5A-25 (Tang Primer 25K), ECP5-25 | **NES, SNES, GB/GBC, SMS** | TangCore lists NES + SNES on the Nano 20K and Primer 25K. Same chip also fits the PPU with a 3D-lite rasterizer |
+| **~60k LUT + DDR3** | GW5AT-60 (Tang Console 60K), ECP5-85 | Everything above + **Genesis/Mega Drive, GBA** | Tang Console 60K board is 69 USD retail with DDR3. Large BGA-484, 6+ layer board |
+| 138k LUT | GW5AST-138 | + Amiga, PS1 work in progress | Out of scope (no PS1/PS2, as decided) |
+
+### Cost
+
+| Tier | Systems in hardware | FPGA + RAM per device (rough) | Fits 40 to 50 EUR? |
+|---|---|---|---|
+| GPU only (iCE40UP5K) | none (P4 software emu stays) | +7 to 15 EUR | Yes, tight |
+| **GPU + 8/16-bit (GW5A-25 or ECP5-25 + SDRAM)** | NES, SNES, GB/GBC, SMS | +20 to 50 EUR (ECP5-25 cheapest when in stock; GW5A-25 is 42.92 USD at LCSC today) | No, needs ~65 to 90 EUR |
+| GPU + Genesis/GBA (60k class + DDR3) | + Genesis, GBA | +40 to 70 EUR, BGA-484, 6 to 8 layers | No, ~90 to 120 EUR, closer to a Tang Console / Game Bub |
+
+### Licences
+
+All the useful cores are GPL (MiSTer, TangCore, Game Bub: GPL-2/3). We can still ship them, kept apart from our MIT code:
+
+- A bitstream is a separate program that our firmware loads from a file, like a ROM or an app. Our MIT firmware does not link against it, so it stays MIT ("mere aggregation" under the GPL).
+- Keep the GPL cores in their own repo (for example `pocketbit-cores`), publish their full source with each build, and keep their licence files. Never paste GPL Verilog into the BitKit PPU.
+- Simplest and cleanest: users drop core files on the SD card next to their ROMs (`/cores/nes.bit`). We can also offer them as an optional download from the Settings app.
+- ROMs stay the user's own, as with the current emulators.
+
+### What this means for the plan
+
+Calvin is open to a bigger screen, 3D on the base model and either HDL. With emulation on top, the trade-off becomes the budget:
+
+- **Option 1, stay at 40 to 50 EUR:** iCE40UP5K PPU only (2D GPU + looks). Emulation stays in P4 software (GB/GBC/NES now, SMS/SNES/Genesis possible with Retro-Go-style code). No 3D in hardware.
+- **Option 2, ~70 to 90 EUR (recommended if the budget can move):** one ~25k LUT FPGA (ECP5-25 for the mature open toolchain, or GW5A-25 which is in stock and has MIPI for a bigger screen) + 32 MB SDRAM. Runs the BitKit PPU with a 3D-lite rasterizer for our games **and** NES/SNES/GB/GBC/SMS cores in hardware. Bigger screen (480×320 or 640×480) fits.
+- **Option 3, 100 EUR+:** 60k class for Genesis + GBA too. Gets close to buying a Tang Console or Game Bub, and the board gets much harder (BGA-484, DDR3).
+
+## Answers from Calvin (2026-11-14)
+
+- Open to a bigger screen, 3D on the base model, and Verilog or Amaranth.
+- Asked whether the FPGA could emulate more: see section 10.
+- Still open: how far the 40 to 50 EUR budget can move.
 
 ## Sources
 
@@ -204,6 +247,10 @@ Software side (BitKit): a `bk_gpu` layer with two backends, "software" (today's 
 - ESP32-P4 PARLIO: https://docs.espressif.com/projects/esp-idf/en/v5.4/esp32p4/api-reference/peripherals/parlio.html
 - Tang Primer 25K (GW5A): https://wiki.sipeed.com/hardware/en/tang/tang-primer-25k/primer-25k.html
 - LCSC iCE40UP5K: https://www.lcsc.com/product-detail/C1519053.html, JLC C2678152: https://jlcpcb.com/partdetail/Lattice-ICE40UP5KSG48I/C2678152
+- TangCore cores: https://github.com/inindev/fpga_tangcore, NESTang: https://github.com/nand2mario/nestang, SNESTang: https://github.com/nand2mario/snestang, MDTang: https://nand2mario.github.io/posts/2024/mdtang
+- Tang Console 60K/138K: https://www.cnx-software.com/2025/05/27/sipeed-tang-console-a-gowin-gw5ast-gw5at-board-with-60k-or-138k-lut-for-fpga-development-and-retro-gaming/
+- iceboy (GB on iCE40HX8K, CERN-OHL-W): https://github.com/msinger/iceboy
+- LCSC GW5A-25: https://www.lcsc.com/product-detail/C45617374.html
 - LCSC GW2AR-18: https://www.lcsc.com/product-detail/C380550.html
 - Mouser GW1NR-9: https://www.mouser.com/en/ProductDetail/GOWIN-Semiconductor/GW1NR-LV9QN88PC6-I5
 - LCSC LFE5U-25F: https://lcsc.com/product-detail/Programmable-Logic-Device-CPLDs-FPGAs_Lattice-LFE5U-25F-6BG256C_C1521614.html
